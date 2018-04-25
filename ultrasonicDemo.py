@@ -3,15 +3,17 @@ import time
 import threading
 GPIO.setmode(GPIO.BCM)
 
-# Flashes the LED 5 times.
-def flashLED(signal):
+# Flashes the LED and buzzes 5 times.
+def trigger(signal):
     while True:
         signal.wait()   # Waits for the signal from the main thread
         
         for i in range(5):
             GPIO.output(LED, True)
+            GPIO.output(BUZZER, True)
             time.sleep(.05)
             GPIO.output(LED, False)
+            GPIO.output(BUZZER, False)
             time.sleep(.05)
 
         signal.clear() # Clears the signal (resets)
@@ -21,6 +23,7 @@ if __name__ == "__main__":
     TRIG = 23 
     ECHO = 24
     LED = 4
+    BUZZER = 17
 
     MIN_DISTANCE = 24 # In inches
 
@@ -30,8 +33,10 @@ if __name__ == "__main__":
     GPIO.setup(TRIG,GPIO.OUT)
     GPIO.setup(ECHO,GPIO.IN)
     GPIO.setup(LED, GPIO.OUT)
+    GPIO.setup(BUZZER, GPIO.OUT)
 
     GPIO.output(LED, False)
+    GPIO.output(BUZZER, False)
 
     # This sends the signal for the ultrasonic sensor to turn on
     GPIO.output(TRIG, False)
@@ -42,8 +47,8 @@ if __name__ == "__main__":
     GPIO.output(TRIG, False)
 
     signal = threading.Event() # This is used to signal the LED to flash
-    flash_thread = threading.Thread(target = flashLED, args = (signal,)) # The flashLED function is run in a separate thread, non-blocking
-    flash_thread.start()    # Run the new thread
+    trigger_thread = threading.Thread(target = trigger, args = (signal,)) # The flashLED function is run in a separate thread, non-blocking
+    trigger_thread.start()    # Run the new thread
     
 
     try:
@@ -68,7 +73,7 @@ if __name__ == "__main__":
 
             if (inches < MIN_DISTANCE):
                 print("Distance:",cm,"cm ",inches,"in")
-                signal.set()    # Let the flashLED thread know that it's time to
+                signal.set()    # Let the trigger thread know that it's time to
                 
     except KeyboardInterrupt:
         GPIO.cleanup()
