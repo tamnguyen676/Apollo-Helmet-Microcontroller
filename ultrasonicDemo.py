@@ -3,40 +3,47 @@ import time
 import threading
 GPIO.setmode(GPIO.BCM)
 
+TRIG = 23 
+ECHO = 24
+LED = 17
+
+MIN_DISTANCE = 36 # In inches
+
+
 # Flashes the LED and buzzes 5 times.
 def trigger(signal):
+    global inches
+    
     while True:
         signal.wait()   # Waits for the signal from the main thread
         
+        if inches < 5:
+            x = 5
+        else:
+            x = inches
+        
+        delay = (x - 5) * .002581 + .02
+        
+        print(x, "in ", delay)
+        
         for i in range(5):
             GPIO.output(LED, True)
-            GPIO.output(BUZZER, True)
-            time.sleep(.05)
+            time.sleep(delay)
             GPIO.output(LED, False)
-            GPIO.output(BUZZER, False)
-            time.sleep(.05)
-
+            time.sleep(delay)
+        
         signal.clear() # Clears the signal (resets)
             
 # Main function
 if __name__ == "__main__":
-    TRIG = 23 
-    ECHO = 24
-    LED = 4
-    BUZZER = 17
-
-    MIN_DISTANCE = 24 # In inches
-
     print("Distance Measurement In Progress")
 
     # Set up pins as input or output
     GPIO.setup(TRIG,GPIO.OUT)
     GPIO.setup(ECHO,GPIO.IN)
     GPIO.setup(LED, GPIO.OUT)
-    GPIO.setup(BUZZER, GPIO.OUT)
 
     GPIO.output(LED, False)
-    GPIO.output(BUZZER, False)
 
     # This sends the signal for the ultrasonic sensor to turn on
     GPIO.output(TRIG, False)
@@ -72,7 +79,7 @@ if __name__ == "__main__":
             inches = round(cm * .39,2)
 
             if (inches < MIN_DISTANCE):
-                print("Distance:",cm,"cm ",inches,"in")
+                # print("Distance:",cm,"cm ",inches,"in")
                 signal.set()    # Let the trigger thread know that it's time to
                 
     except KeyboardInterrupt:
