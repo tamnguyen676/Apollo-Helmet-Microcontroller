@@ -1,0 +1,8 @@
+#sudo modprobe fbtft_device fps=50 txbuflen=32768 name=sainsmart18 rotate=90
+
+#raspivid -t 0
+#sudo python /home/pi/pica.py
+
+#cd rpi-fbcp/build 
+#./fbcp &
+sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=90
