@@ -9,23 +9,6 @@ from PIL import Image   # to create image using preset png
 from time import sleep
 import json             # for JSON object parsing
 
-def bash_command(bash_cmd):
-    import subprocess
-    subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, shell=True)
-#bluetooth name for raspberry pi is "raspberrypi"
-
-# function to update the LCD display
-def display_update(turimport bluetooth
-import threading
-
-from adxl345 import ADXL345
-import adxl345
-import os       
-import picamera         # the camera video output library
-from PIL import Image   # to create image using preset png
-from time import sleep
-import json             # for JSON object parsing
-
 
 
 # set up camera and start it 
