@@ -26,9 +26,9 @@ camera.contrast = 75
 bash_command("sudo hciconfig hci0 piscan noauth")
 
 # set the text color
-camera.annotate_background = picamera.Color('red')
+camera.annotate_background = picamera.Color('black')
 # text size
-camera.annotate_text_size = 80      
+camera.annotate_text_size = 100      
 #bluetooth name for raspberry pi is "raspberrypi"
 
 json_queue = Queue()
@@ -50,16 +50,12 @@ def is_json(myjson):
     return False
   return True
 # function to update the LCD display
-def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
-    if upcoming_road == "":
-        camera.stop_preview()
-        camera.close()
-    
+def turn_update(turn, upcoming_road, distance_left,  new_maneuver):      
     if turn in ("GO_STRAIGHT","UNDEFINED"):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/straight.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/straight.png")
         if turn in "UNDEFINED":
             camera.annotate_text= 'Continue for:' + distance_left
         else:
@@ -68,7 +64,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/right.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/right.png")
         if upcoming_road == "":
             camera.annotate_text= 'Turn right: ' + distance_left
         else:
@@ -77,7 +73,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/left.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/left.png")
         if upcoming_road == "":
             camera.annotate_text= 'Turn left: ' + distance_left
         else:    
@@ -86,7 +82,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/u_turn.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/u_turn.png")
         if upcoming_road == "":
             camera.annotate_text= 'Make a U-Turn: ' + distance_left
         else:
@@ -95,7 +91,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 100 /home/pi/arrows/keep_right.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 220 /home/pi/Project-Apollo/arrows/keep_right.png")
         if upcoming_road == "":
             camera.annotate_text= 'Keep right: ' + distance_left
         else:
@@ -104,13 +100,13 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 100 /home/pi/arrows/keep_middle.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 220 /home/pi/Project-Apollo/arrows/keep_middle.png")
         camera.annotate_text= 'Stay in the middle on ' + upcoming_road + " : " + distance_left
     elif turn in ("KEEP_LEFT","HIGHWAY_KEEP_LEFT"):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 100 /home/pi/arrows/keep_left.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 220 /home/pi/Project-Apollo/arrows/keep_left.png")
         if upcoming_road == "":
             camera.annotate_text= 'Keep left: ' + distance_left
         else:
@@ -120,7 +116,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/split_right.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/split_right.png")
         if turn in ("ENTER_HIGHWAY_RIGHT_LANE"):
             camera.annotate_text= 'Enter Highway ' + upcoming_road + " with right lane: " + distance_left
         else:
@@ -129,7 +125,7 @@ def turn_update(turn, upcoming_road, distance_left,  new_maneuver):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)
-            bash_command("sudo raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 90 /home/pi/arrows/split_left.png")
+            bash_command("sudo /home/pi/raspidmx/pngview/pngview -n -b 0 -l 3 -x 0 -y 200 /home/pi/Project-Apollo/arrows/split_left.png")
         if turn in ("ENTER_HIGHWAY_RIGHT_LANE"):
             camera.annotate_text= 'Enter Highway ' + upcoming_road + " with Left lane: " + distance_left
         else:
@@ -205,7 +201,7 @@ def get_from_queue(q):
         json_str = q.get()
         print "json from the queue: " + json_str
         display(json_str)
-        sleep(.5)
+        sleep(2)
         q.task_done() # indicate a formerly enqueued task is done
         #it will resume q.join() if it is blocking and resume when all items has been processed
         
@@ -217,14 +213,16 @@ def runServer():
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = 1
-    
-    serverSocket.bind(("",port))
+    print uuid
+    serverSocket.bind(("",bluetooth.PORT_ANY))
   
     print "Listening for connections on port: ", port   
 
     # wait for a message to be sent to this socket only once
     serverSocket.listen(1)
+    print "waiting"
     port=serverSocket.getsockname()[1]
+    print"store port"
    
     # you were 90% there, just needed to use the pyBluez command:
     bluetooth.advertise_service( serverSocket, "SampleServer",
@@ -232,29 +230,33 @@ def runServer():
                         service_classes = [ uuid, bluetooth.SERIAL_PORT_CLASS ],
                         profiles = [bluetooth.SERIAL_PORT_PROFILE] 
                         )
+    print"broadcast port"
 
     inputSocket,address = serverSocket.accept()
     print "Accepted connection"
     print "Got connection with" , address
-
-
+    camera.start_preview()
     
 
 try:
-   
+    bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
 
-    #bash_command("sudo rpi-fbcp/build/fbcp &")   # redirect/copy the all output from fb 0 to fb1 
+    sleep(2)    
+    bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1 
         
     #turn on camera
     #camera.start_preview()
     # the max G before the RPI trigger the SMS
-    MAX_G = 5
+#    MAX_G = 5
+#
+#    #intialize the accerelometer
+#    acc = ADXL345()
+#    acc.setRange(adxl345.RANGE_16G)
+#    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
 
-    #intialize the accerelometer
-    acc = ADXL345()
-    acc.setRange(adxl345.RANGE_16G)
-    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
-    
+
+
+    global serverSocket, inputSocket 
     name="bt_server"
     target_name="test"
     # some random uuid, generated by https://www.famkruithof.net/uuid/uuidgen
@@ -276,9 +278,9 @@ try:
     receiveThread.start()
         
     # start a sending thread for crash detection    
-    crashThread  = threading.Thread(target=check_g_force, args=(acc,))
-    crashThread.daemon = True
-    crashThread.start()
+#    crashThread  = threading.Thread(target=check_g_force, args=(acc,))
+#    crashThread.daemon = True
+#    crashThread.start()
     while 1:
         sleep(1)
 ##    distance = 280
@@ -299,6 +301,6 @@ try:
         
     
     
-except KeyboardInterrupt:
+except KeyboardInterrupt, BluetoothError:
     serverSocket.close()
     inputSocket.close()
