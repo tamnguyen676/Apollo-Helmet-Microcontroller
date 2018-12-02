@@ -239,13 +239,16 @@ def runServer():
     
 
 try:
+    #this command enable the video to be use
     bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
-
-    sleep(2)    
+    # wait until the screen initialize
+    sleep(2)
+    
     bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1 
         
     #turn on camera
     #camera.start_preview()
+    
     # the max G before the RPI trigger the SMS
 #    MAX_G = 5
 #
