@@ -159,9 +159,9 @@ def runServer():
     print "Accepted connection"
     print "Got connection with" , address
     
-    acceleromter = Accelerometer()
+    accelerometer = Accelerometer()
             
-    crashThread  = threading.Thread(target=check_g_force, args=(acceleromter.acc, inputSocket))
+    crashThread  = threading.Thread(target=check_g_force, args=(accelerometer.acc, inputSocket))
     crashThread.daemon = True
     crashThread.start()
 
