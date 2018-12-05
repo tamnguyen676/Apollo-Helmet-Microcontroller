@@ -3,7 +3,7 @@ import adxl345
 from time import sleep
 global crashSensorOn
 class Accelerometer:
-    MAX_G = 5
+    MAX_G = 2
     
     def __init__(self):
         self.acc = ADXL345()

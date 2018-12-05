@@ -15,6 +15,12 @@ global inputSocket, serverSocket
 crashSensorOn = True
 hudOn = True
 
+#initialize the GPIO
+GPIO.setmode(GPIO.BCM)
+
+BLIGHT = 17
+#set up pin 17 as output
+GPIO.setup(BLIGHT,GPIO.OUT) ########
 #make rpi bluetooth discoverable via hciconfig and noauth makes it so that we dont have to click "accept"
 bash_command("sudo hciconfig hci0 piscan noauth")
 
@@ -62,8 +68,8 @@ def readIncomingData(inputSocket,q):
         print data
         #print "received \"%s\" \n " % data
         if "Connected" in data:
-            
             camera.annotate_text= "Connected"
+            camera.annotate_text= ""
             pass
         else:
             #split the received data based on how many json obj there is
@@ -78,15 +84,19 @@ def readIncomingData(inputSocket,q):
                     #push it to the queue if it is a valid json
                     if (is_json(json_obj)):
                         q.put(json_obj)
-def kill_screen(state):
+def power_screen(state):
     #GPIO 17 is the pin for backlight
-    GPIO.output(17, state)   
-    if state == True:
+    GPIO.output(BLIGHT, state)   
+    if state == False:
         bash_command("sudo killall -9 fbcp")
+        sleep(2)
         bash_command("sudo rmmod fb_st7735r")
+        sleep(1)
     else:
         bash_command("sudo modprobe fb_st7735r")
-        bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")   
+        sleep(2)
+        bash_command("fbcp &") 
+        
     
 def get_from_queue(q):
     """ this thread function that will get json str from the queue one by one and pass it to the display function"""
@@ -104,13 +114,14 @@ def get_from_queue(q):
         ## change cras,display/blindspot to keys
         if "crashSensor" in json_data:
             state = json_data["crashSensor"]
-            crashSensorOn = False
+            global crashSensorOn
+            crashSensorOn = state
             #turn on/off crash sensor
         elif "hud" in json_data:
             # turn on/off gpio 17
             #GPIO.output(GPIO #, True or False)\
             state = json_data["hud"]
-            kill_screen(state)            
+            power_screen(state)            
         elif "blindspotSensor" in json_data:
             state = json_data["blindspotSensor"]
             pass
@@ -121,6 +132,7 @@ def get_from_queue(q):
                 
 def runServer():
     global serverSocket, inputSocket
+            
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = 1
@@ -146,6 +158,12 @@ def runServer():
     inputSocket,address = serverSocket.accept()
     print "Accepted connection"
     print "Got connection with" , address
+    
+    acceleromter = Accelerometer()
+            
+    crashThread  = threading.Thread(target=check_g_force, args=(acceleromter.acc, inputSocket))
+    crashThread.daemon = True
+    crashThread.start()
 
     try:
         readIncomingData(inputSocket, json_queue)
@@ -163,13 +181,18 @@ def check_g_force(acc, inputSocket):
             while crashSensorOn:        
                 axes = acc.getAxes(True)
                 # print "ADXL345 on address 0x%x:" % (acc.address)
-                if axes['x'] > Accelerometer.MAX_G or axes['y'] > Accelerometer.MAX_G or axes['z'] > Accelerometer.MAX_G:
+                if abs(axes['x']) > Accelerometer.MAX_G or abs(axes['y']) > Accelerometer.MAX_G or abs(axes['z']) > Accelerometer.MAX_G:
+                        print str(crashSensorOn)
                         message = "Crash"
+                        print "Crash detected! " + str(axes['x']) + "," + str(axes['y']) + "," + str(axes['z'])
                         inputSocket.send(message.encode())
-                        sleep(20)
+                        sleep(2)
+                  
 
 if __name__=="__main__":
     try:
+        bash_command("sudo killall fbcp")
+        sleep(2)
         #this command enable the video to be use
         bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
         # wait until the screen initialize
@@ -200,15 +223,8 @@ if __name__=="__main__":
             # set the text color
             camera.annotate_background = picamera.Color('black')
             # text size
-            camera.annotate_text_size = 100
+            camera.annotate_text_size = 70
             # camera.start_preview()
-
-            acceleromter = Accelerometer()
-            
-            crashThread  = threading.Thread(target=check_g_force, args=(acceleromter.acc, inputSocket))
-            crashThread.daemon = True
-            crashThread.start()
-
 
             runServer()
     except KeyboardInterrupt:
