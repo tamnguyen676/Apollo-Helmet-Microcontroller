@@ -1,6 +1,7 @@
 import bluetooth
 import threading
 
+import RPi.GPIO as GPIO
 from navigation import *
 from adxl345 import ADXL345
 from Queue import Queue # for bluetooth messaging processing 
@@ -9,29 +10,18 @@ import os
 import picamera         # the camera video output library
 from PIL import Image   # to create image using preset png
 
-# set up camera and start it, global variable so other functions can use it too
-camera = picamera.PiCamera()    
-camera.resolution = (1280, 720) # set up resolution
-camera.framerate = 24
-camera.brightness = 70
-camera.contrast = 75
+global camera   
 
 #make rpi bluetooth discoverable via hciconfig and noauth makes it so that we dont have to click "accept"
 bash_command("sudo hciconfig hci0 piscan noauth")
 
-# set the text color
-camera.annotate_background = picamera.Color('black')
-# text size
-camera.annotate_text_size = 100      
-#bluetooth name for raspberry pi is "raspberrypi"
+
 global json_queue
 json_queue = Queue()
 
 # function to decode JSON file and calls the display function
-def display(json_str):
-    global turn, upcoming_road 
-    json_object     = json.loads(json_str)
-          
+def display(json_object):
+    global turn, upcoming_road           
     # boolean flag to indicate if we reached our destination
     # inform Tam, boolean needs to pass thru as lowercase
     end = json_object["end"]
@@ -64,6 +54,13 @@ def arrived():
     camera.annotate_text= ''
 
 def check_g_force(acc):
+    # the max G before the RPI trigger the SMS
+    MAX_G = 5
+    
+    #intialize the accerelometer
+    acc = ADXL345()
+    acc.setRange(adxl345.RANGE_16G)
+    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
     while True:        
         axes = acc.getAxes(True)
         # print "ADXL345 on address 0x%x:" % (acc.address)
@@ -76,9 +73,10 @@ def readIncomingData(inputSocket,q):
     """This Function will read data if available, in the bluetooth socket"""
     while True:
         data=inputSocket.recv(1024)
+        print data
         #print "received \"%s\" \n " % data
         if "Connected" in data:
-            print data
+            
             camera.annotate_text= "Connected"
             pass
         else:
@@ -94,7 +92,16 @@ def readIncomingData(inputSocket,q):
                     #push it to the queue if it is a valid json
                     if (is_json(json_obj)):
                         q.put(json_obj)
-
+def kill_screen(state):
+    #GPIO 17 is the pin for backlight
+    GPIO.output(17, state)   
+    if state == True:
+        bash_command("sudo killall -9 fbcp")
+        bash_command("sudo rmmod fb_st7735r")
+    else:
+        bash_command("sudo modprobe fb_st7735r")
+        bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")   
+    
 def get_from_queue(q):
     """ this thread function that will get json str from the queue one by one and pass it to the display function"""
     global turn, upcoming_road  
@@ -105,8 +112,23 @@ def get_from_queue(q):
         # this .get() function will block until there is item available
         json_str = q.get()
         print "json from the queue: " + json_str
-        display(json_str)
-        sleep(2)
+        
+        json_data = json.loads(json_str)
+        
+        ## change cras,display/blindspot to keys
+        if "crashSensor" in json_data:
+            state = json_data["crashSensor"]
+            #turn on/off crash sensor
+        elif "hud" in json_data:
+            # turn on/off gpio 17
+            #GPIO.output(GPIO #, True or False)\
+            state = json_data["hud"]
+            kill_screen(state)            
+        elif "blindspotSensor" in json_data:
+            state = json_data["blindspotSensor"]
+            pass
+        elif "end" in json_data:     
+            display(json_data) # display and update the screen
         q.task_done() # indicate a formerly enqueued task is done
         #it will resume q.join() if it is blocking and resume when all items has been processed
                 
@@ -116,7 +138,7 @@ def runServer():
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = 1
     print uuid
-    serverSocket.bind(("",bluetooth.PORT_ANY))
+    serverSocket.bind(("",1))
   
     print "Listening for connections on port: ", port   
 
@@ -143,47 +165,54 @@ def runServer():
     except bluetooth.btcommon.BluetoothError:
         inputSocket.close()
         serverSocket.close()
+        camera.close()
         print "Bluetooth connection reset"
 
 if __name__=="__main__":
-    global screenOn, crashSensorOn
-    screenOn = True
-    crashSensorOn = True
-    
-    #this command enable the video to be use
-    bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
-    # wait until the screen initialize
-    sleep(2)
-    
-    bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1
+    try:
+        global screenOn, crashSensorOn
+        global inputSocket, serverSocket
+        screenOn = True
+        crashSensorOn = True
+        
+        #this command enable the video to be use
+        bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
+        # wait until the screen initialize
+        sleep(2)
+        
+        bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1
+        
+        global serverSocket, inputSocket 
+        name="bt_server"
+        target_name="test"
+        # some random uuid, generated by https://www.famkruithof.net/uuid/uuidgen
+        uuid="0fee0450-e95f-11e5-a837-0800200c9a66"
+        serverSocket = None
+        inputSocket = None
 
-    #turn on camera
-    camera.start_preview()
-    
-    # the max G before the RPI trigger the SMS
-    MAX_G = 5
-#
-#    #intialize the accerelometer
-#    acc = ADXL345()
-#    acc.setRange(adxl345.RANGE_16G)
-#    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
+        # start a thread that will read from the json queue and display json if available
+        displayThread = threading.Thread(target=get_from_queue, args=(json_queue,))
+        displayThread.daemon = True
+        displayThread.start()
 
-    global serverSocket, inputSocket 
-    name="bt_server"
-    target_name="test"
-    # some random uuid, generated by https://www.famkruithof.net/uuid/uuidgen
-    uuid="0fee0450-e95f-11e5-a837-0800200c9a66"
-    serverSocket = None
-    inputSocket = None
-
-    # start a thread that will read from the json queue and display json if available
-    displayThread = threading.Thread(target=get_from_queue, args=(json_queue,))
-    displayThread.daemon = True
-    displayThread.start()
-
-    while True:
-        runServer()
-
+        while True:
+            # set up camera and start it, global variable so other functions can use it too
+            camera = picamera.PiCamera()    
+            camera.resolution = (1280, 720) # set up resolution
+            camera.framerate = 24
+            camera.brightness = 70
+            camera.contrast = 75
+            # set the text color
+            camera.annotate_background = picamera.Color('black')
+            # text size
+            camera.annotate_text_size = 100
+#            camera.start_preview()
+            runServer()
+    except KeyboardInterrupt:
+        inputSocket.close()
+        serverSocket.close()
+        camera.close()
+        
 
 # try:
 #     #this command enable the video to be use
