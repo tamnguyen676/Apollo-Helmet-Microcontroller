@@ -3,18 +3,20 @@ import threading
 
 import RPi.GPIO as GPIO
 from navigation import *
-from adxl345 import ADXL345
+from acceleromter import Accelerometer
 from Queue import Queue # for bluetooth messaging processing 
-import adxl345
 import os       
 import picamera         # the camera video output library
 from PIL import Image   # to create image using preset png
 
 global camera   
+global crashSensorOn, hudOn
+global inputSocket, serverSocket
+crashSensorOn = True
+hudOn = True
 
 #make rpi bluetooth discoverable via hciconfig and noauth makes it so that we dont have to click "accept"
 bash_command("sudo hciconfig hci0 piscan noauth")
-
 
 global json_queue
 json_queue = Queue()
@@ -52,22 +54,6 @@ def arrived():
     camera.annotate_text= 'Arrived!'
     sleep(2)
     camera.annotate_text= ''
-
-def check_g_force(acc):
-    # the max G before the RPI trigger the SMS
-    MAX_G = 5
-    
-    #intialize the accerelometer
-    acc = ADXL345()
-    acc.setRange(adxl345.RANGE_16G)
-    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
-    while True:        
-        axes = acc.getAxes(True)
-        # print "ADXL345 on address 0x%x:" % (acc.address)
-        if axes['x'] > MAX_G or axes['y'] > MAX_G or axes['z'] > MAX_G:
-            message = "Crash"
-            inputSocket.send(message.encode())
-            sleep(20)
 
 def readIncomingData(inputSocket,q):
     """This Function will read data if available, in the bluetooth socket"""
@@ -118,6 +104,7 @@ def get_from_queue(q):
         ## change cras,display/blindspot to keys
         if "crashSensor" in json_data:
             state = json_data["crashSensor"]
+            crashSensorOn = False
             #turn on/off crash sensor
         elif "hud" in json_data:
             # turn on/off gpio 17
@@ -168,13 +155,21 @@ def runServer():
         camera.close()
         print "Bluetooth connection reset"
 
+
+def check_g_force(acc, inputSocket):
+        global crashSensorOn
+
+        while True:
+            while crashSensorOn:        
+                axes = acc.getAxes(True)
+                # print "ADXL345 on address 0x%x:" % (acc.address)
+                if axes['x'] > Accelerometer.MAX_G or axes['y'] > Accelerometer.MAX_G or axes['z'] > Accelerometer.MAX_G:
+                        message = "Crash"
+                        inputSocket.send(message.encode())
+                        sleep(20)
+
 if __name__=="__main__":
     try:
-        global screenOn, crashSensorOn
-        global inputSocket, serverSocket
-        screenOn = True
-        crashSensorOn = True
-        
         #this command enable the video to be use
         bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
         # wait until the screen initialize
@@ -206,13 +201,22 @@ if __name__=="__main__":
             camera.annotate_background = picamera.Color('black')
             # text size
             camera.annotate_text_size = 100
-#            camera.start_preview()
+            # camera.start_preview()
+
+            acceleromter = Accelerometer()
+            
+            crashThread  = threading.Thread(target=check_g_force, args=(acceleromter.acc, inputSocket))
+            crashThread.daemon = True
+            crashThread.start()
+
+
             runServer()
     except KeyboardInterrupt:
         inputSocket.close()
         serverSocket.close()
         camera.close()
-        
+
+
 
 # try:
 #     #this command enable the video to be use
