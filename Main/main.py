@@ -4,16 +4,17 @@ import threading
 import RPi.GPIO as GPIO
 from navigation import *
 from acceleromter import Accelerometer
+from blindspot import BlindspotSensor
 from Queue import Queue # for bluetooth messaging processing 
 import os       
 import picamera         # the camera video output library
 from PIL import Image   # to create image using preset png
+import time
 
 global camera   
-global crashSensorOn, hudOn
+global crashSensorOn, hudOn, blindspotSensorOn
 global inputSocket, serverSocket
-crashSensorOn = True
-hudOn = True
+crashSensorOn = hudOn = blindspotSensorOn = True
 
 #initialize the GPIO
 GPIO.setmode(GPIO.BCM)
@@ -51,6 +52,38 @@ def display(json_object):
         else:
             distance_left   = json_object["distance"]
             turn_update(turn,upcoming_road,distance_left,new_maneuver, camera)  
+
+    #pulse timing thread, to use pulse timer to calculate the distance of the detected object
+def pulse(signal, ECHO):
+    while True:
+        while blindspotSensorOn:
+            while GPIO.input(ECHO) == 0:
+                pass
+            while GPIO.input(ECHO)==1:
+                pulse_start = time.time()
+            while GPIO.input(ECHO)==0:
+                pulse_end = time.time() 
+            # Measures the time the ultrasonic pulse takes to get back
+            pulse_duration = pulse_end - pulse_start
+            
+            cm = pulse_duration / .00005 # Our sensor has conversion of 1cm per 50us
+            cm = round(cm, 2)
+            inches = round(cm * 0.39, 2)
+
+            if (inches < BlindspotSensor.MAX_DISTANCE):
+                print("Distance:",cm,"cm ",inches,"in")
+                signal.set()    # Let the trigger thread know that it's time to flash
+
+# Flashes the LED and buzzes 5 times.
+def trigger(signal,LED):
+    while True:
+        signal.wait() 
+        for i in range(5):
+            GPIO.output(LED, True)
+            time.sleep(0.000002)
+            GPIO.output(LED, False)
+            time.sleep(0.000002)
+        signal.clear() # Clears the signal (resets)
             
 # function to display destination arrived and delete all arrow and texts
 def arrived():
@@ -159,11 +192,22 @@ def runServer():
     print "Accepted connection"
     print "Got connection with" , address
     
-    accelerometer = Accelerometer()
-            
+    accelerometer = Accelerometer()        
     crashThread  = threading.Thread(target=check_g_force, args=(accelerometer.acc, inputSocket))
     crashThread.daemon = True
     crashThread.start()
+
+    blindspotSensor = BlindspotSensor()
+     # The flashLED function is run in a separate thread, non-blocking 
+    l_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.l_signal, BlindspotSensor.LLED))
+    r_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.r_signal, BlindspotSensor.RLED))
+    l_trigger_thread.start()
+    r_trigger_thread.start()
+
+    l_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.l_signal, BlindspotSensor.LECHO))
+    r_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.r_signal, BlindspotSensor.RECHO))
+    l_pulse_thread.start()
+    r_pulse_thread.start()
 
     try:
         readIncomingData(inputSocket, json_queue)
@@ -227,7 +271,8 @@ if __name__=="__main__":
             # camera.start_preview()
 
             runServer()
-    except KeyboardInterrupt:
+    except Exception:
+        GPIO.cleanup()
         inputSocket.close()
         serverSocket.close()
         camera.close()
