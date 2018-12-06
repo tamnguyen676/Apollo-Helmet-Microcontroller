@@ -12,9 +12,9 @@ from PIL import Image   # to create image using preset png
 import time
 
 global camera   
-global crashSensorOn, hudOn, blindspotSensorOn
+global crashSensorOn, hudOn
 global inputSocket, serverSocket
-crashSensorOn = hudOn = blindspotSensorOn = True
+crashSensorOn = hudOn = True
 
 #initialize the GPIO
 GPIO.setmode(GPIO.BCM)
@@ -53,39 +53,6 @@ def display(json_object):
             distance_left   = json_object["distance"]
             turn_update(turn,upcoming_road,distance_left,new_maneuver, camera)  
 
-    #pulse timing thread, to use pulse timer to calculate the distance of the detected object
-def pulse(signal, ECHO):
-    global blindspotSensorOn
-    while True:
-        while blindspotSensorOn:
-            while GPIO.input(ECHO) == 0:
-                pass
-            while GPIO.input(ECHO)==1:
-                pulse_start = time.time()
-            while GPIO.input(ECHO)==0:
-                pulse_end = time.time() 
-            # Measures the time the ultrasonic pulse takes to get back
-            pulse_duration = pulse_end - pulse_start
-            
-            cm = pulse_duration / .00005 # Our sensor has conversion of 1cm per 50us
-            cm = round(cm, 2)
-            inches = round(cm * 0.39, 2)
-
-            if (inches < BlindspotSensor.MAX_DISTANCE):
-                sleep(.01)
-                signal.set()    # Let the trigger thread know that it's time to flash
-
-# Flashes the LED and buzzes 5 times.
-def trigger(signal,LED):
-    while True:
-        signal.wait()
-        print "Trigger"
-        for i in range(5):
-            GPIO.output(LED, True)
-            time.sleep(0.000002)
-            GPIO.output(LED, False)
-            time.sleep(0.000002)
-        signal.clear() # Clears the signal (resets)
             
 # function to display destination arrived and delete all arrow and texts
 def arrived():
@@ -136,6 +103,13 @@ def power_screen(state):
         sleep(2)
         bash_command("fbcp &") 
         
+def blindspotSensor(state):
+    #On
+    if state:
+        bash_command("/usr/bin/python3 /home/pi/Project-Apollo/Ultrasonic/blindSpot.py")
+    #Off
+    else:
+        bash_command("sudo pkill -2 python3")
     
 def get_from_queue(q):
     """ this thread function that will get json str from the queue one by one and pass it to the display function"""
@@ -163,9 +137,18 @@ def get_from_queue(q):
             power_screen(state)            
         elif "blindspotSensor" in json_data:
             state = json_data["blindspotSensor"]
-            global blindspotSensorOn
-            blindspotSensorOn = state
+            
+            #call the function to enable u;tasonic sensor
+            blindspotSensor(state)
             pass
+        elif "killPi" in json_data:
+            try:
+                GPIO.cleanup()
+                inputSocket.close()
+                serverSocket.close()
+                camera.close()
+            finally:
+                bash_command("sudo shutdown now")
         elif "end" in json_data:     
             display(json_data) # display and update the screen
         q.task_done() # indicate a formerly enqueued task is done
@@ -173,7 +156,7 @@ def get_from_queue(q):
                 
 def runServer():
     global serverSocket, inputSocket
-            
+    GPIO.output(BLIGHT, True)                
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = bluetooth.PORT_ANY
@@ -206,6 +189,7 @@ def runServer():
     except bluetooth.btcommon.BluetoothError:
         inputSocket.close()
         serverSocket.close()
+        GPIO.output(BLIGHT, False)
         camera.close()
         print "Bluetooth connection reset"
 
@@ -221,7 +205,12 @@ def check_g_force(acc, inputSocket):
                         print str(crashSensorOn)
                         message = "Crash"
                         print "Crash detected! " + str(axes['x']) + "," + str(axes['y']) + "," + str(axes['z'])
-                        inputSocket.send(message.encode())
+                        if inputSocket is None:
+                            print "Socket is Null"
+                        try:
+                            inputSocket.send(message.encode())
+                        except BluetoothError:
+                            print "Bad file descriptor happened here"
                         sleep(2)
                   
 
@@ -250,24 +239,11 @@ if __name__=="__main__":
         displayThread.daemon = True
         displayThread.start()
         
-        blindspotSensor = BlindspotSensor()
-         # The flashLED function is run in a separate thread, non-blocking 
-        l_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.l_signal, BlindspotSensor.LLED))
-        r_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.r_signal, BlindspotSensor.RLED))
-        l_trigger_thread.daemon = True
-        r_trigger_thread.daemon = True
-        l_trigger_thread.start()
-        r_trigger_thread.start()
-
-        l_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.l_signal, BlindspotSensor.LECHO))
-        r_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.r_signal, BlindspotSensor.RECHO))
-        l_pulse_thread.daemon = True
-        r_pulse_thread.daemon = True
-        l_pulse_thread.start()
-        r_pulse_thread.start()
-
-
+        #turn the blind spot sensor on
+        blindspotSensor(True)
+                
         while True:
+            GPIO.output(BLIGHT, False)
             # set up camera and start it, global variable so other functions can use it too
             camera = picamera.PiCamera()    
             camera.resolution = (1280, 720) # set up resolution
@@ -278,19 +254,21 @@ if __name__=="__main__":
             camera.annotate_background = picamera.Color('black')
             # text size
             camera.annotate_text_size = 70
-#            camera.start_preview()
+            camera.start_preview()
 
             runServer()
     except:
+        print "Ending program"
+        traceback.print_exc()
         GPIO.cleanup()
         
         # Turn screen off
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(BLIGHT,GPIO.OUT)
         GPIO.output(BLIGHT, False)
-        
+        inputSocket.close()
         serverSocket.close()
+        
         camera.close()
-        print "Ending program"
-        traceback.print_exc()
+        
         
