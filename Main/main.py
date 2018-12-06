@@ -1,6 +1,6 @@
 import bluetooth
 import threading
-
+import traceback
 import RPi.GPIO as GPIO
 from navigation import *
 from acceleromter import Accelerometer
@@ -55,6 +55,7 @@ def display(json_object):
 
     #pulse timing thread, to use pulse timer to calculate the distance of the detected object
 def pulse(signal, ECHO):
+    global blindspotSensorOn
     while True:
         while blindspotSensorOn:
             while GPIO.input(ECHO) == 0:
@@ -71,13 +72,14 @@ def pulse(signal, ECHO):
             inches = round(cm * 0.39, 2)
 
             if (inches < BlindspotSensor.MAX_DISTANCE):
-                print("Distance:",cm,"cm ",inches,"in")
+                sleep(.01)
                 signal.set()    # Let the trigger thread know that it's time to flash
 
 # Flashes the LED and buzzes 5 times.
 def trigger(signal,LED):
     while True:
-        signal.wait() 
+        signal.wait()
+        print "Trigger"
         for i in range(5):
             GPIO.output(LED, True)
             time.sleep(0.000002)
@@ -96,7 +98,7 @@ def arrived():
 
 def readIncomingData(inputSocket,q):
     """This Function will read data if available, in the bluetooth socket"""
-    while True:
+    while inputSocket is not None:
         data=inputSocket.recv(1024)
         print data
         #print "received \"%s\" \n " % data
@@ -117,6 +119,10 @@ def readIncomingData(inputSocket,q):
                     #push it to the queue if it is a valid json
                     if (is_json(json_obj)):
                         q.put(json_obj)
+    bash_command("sudo killall -s SIGKILL pngview")
+    # show text destination arrived
+    camera.annotate_text= ''
+    
 def power_screen(state):
     #GPIO 17 is the pin for backlight
     GPIO.output(BLIGHT, state)   
@@ -157,6 +163,8 @@ def get_from_queue(q):
             power_screen(state)            
         elif "blindspotSensor" in json_data:
             state = json_data["blindspotSensor"]
+            global blindspotSensorOn
+            blindspotSensorOn = state
             pass
         elif "end" in json_data:     
             display(json_data) # display and update the screen
@@ -168,17 +176,15 @@ def runServer():
             
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    port = 1
+    port = bluetooth.PORT_ANY
     print uuid
-    serverSocket.bind(("",1))
+    serverSocket.bind(("",port))
   
     print "Listening for connections on port: ", port   
 
     # wait for a message to be sent to this socket only once
     serverSocket.listen(1)
-    print "waiting"
     port=serverSocket.getsockname()[1]
-    print"store port"
    
     # you were 90% there, just needed to use the pyBluez command:
     bluetooth.advertise_service( serverSocket, "SampleServer",
@@ -186,28 +192,14 @@ def runServer():
                         service_classes = [ uuid, bluetooth.SERIAL_PORT_CLASS ],
                         profiles = [bluetooth.SERIAL_PORT_PROFILE] 
                         )
-    print"broadcast port"
 
     inputSocket,address = serverSocket.accept()
-    print "Accepted connection"
     print "Got connection with" , address
     
     accelerometer = Accelerometer()        
     crashThread  = threading.Thread(target=check_g_force, args=(accelerometer.acc, inputSocket))
     crashThread.daemon = True
     crashThread.start()
-
-    blindspotSensor = BlindspotSensor()
-     # The flashLED function is run in a separate thread, non-blocking 
-    l_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.l_signal, BlindspotSensor.LLED))
-    r_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.r_signal, BlindspotSensor.RLED))
-    l_trigger_thread.start()
-    r_trigger_thread.start()
-
-    l_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.l_signal, BlindspotSensor.LECHO))
-    r_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.r_signal, BlindspotSensor.RECHO))
-    l_pulse_thread.start()
-    r_pulse_thread.start()
 
     try:
         readIncomingData(inputSocket, json_queue)
@@ -221,7 +213,7 @@ def runServer():
 def check_g_force(acc, inputSocket):
         global crashSensorOn
 
-        while True:
+        while inputSocket is not None:
             while crashSensorOn:        
                 axes = acc.getAxes(True)
                 # print "ADXL345 on address 0x%x:" % (acc.address)
@@ -238,11 +230,12 @@ if __name__=="__main__":
         bash_command("sudo killall fbcp")
         sleep(2)
         #this command enable the video to be use
-        bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
+        bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=90")
         # wait until the screen initialize
         sleep(2)
         
-        bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1
+#        bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1
+        power_screen(True)
         
         global serverSocket, inputSocket 
         name="bt_server"
@@ -256,6 +249,23 @@ if __name__=="__main__":
         displayThread = threading.Thread(target=get_from_queue, args=(json_queue,))
         displayThread.daemon = True
         displayThread.start()
+        
+        blindspotSensor = BlindspotSensor()
+         # The flashLED function is run in a separate thread, non-blocking 
+        l_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.l_signal, BlindspotSensor.LLED))
+        r_trigger_thread = threading.Thread(target = trigger, args = (blindspotSensor.r_signal, BlindspotSensor.RLED))
+        l_trigger_thread.daemon = True
+        r_trigger_thread.daemon = True
+        l_trigger_thread.start()
+        r_trigger_thread.start()
+
+        l_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.l_signal, BlindspotSensor.LECHO))
+        r_pulse_thread = threading.Thread(target = pulse, args = (blindspotSensor.r_signal, BlindspotSensor.RECHO))
+        l_pulse_thread.daemon = True
+        r_pulse_thread.daemon = True
+        l_pulse_thread.start()
+        r_pulse_thread.start()
+
 
         while True:
             # set up camera and start it, global variable so other functions can use it too
@@ -268,58 +278,19 @@ if __name__=="__main__":
             camera.annotate_background = picamera.Color('black')
             # text size
             camera.annotate_text_size = 70
-            # camera.start_preview()
+#            camera.start_preview()
 
             runServer()
-    except Exception:
+    except:
         GPIO.cleanup()
-        inputSocket.close()
+        
+        # Turn screen off
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(BLIGHT,GPIO.OUT)
+        GPIO.output(BLIGHT, False)
+        
         serverSocket.close()
         camera.close()
-
-
-
-# try:
-#     #this command enable the video to be use
-#     bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=270")
-#     # wait until the screen initialize
-#     sleep(2)
-    
-#     bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1 
+        print "Ending program"
+        traceback.print_exc()
         
-#     #turn on camera
-#     camera.start_preview()
-    
-#     # the max G before the RPI trigger the SMS
-#     MAX_G = 5
-# #
-# #    #intialize the accerelometer
-# #    acc = ADXL345()
-# #    acc.setRange(adxl345.RANGE_16G)
-# #    acc.setBandwidthRate(adxl345.BW_RATE_50HZ)
-
-#     global serverSocket, inputSocket 
-#     name="bt_server"
-#     target_name="test"
-#     # some random uuid, generated by https://www.famkruithof.net/uuid/uuidgen
-#     uuid="0fee0450-e95f-11e5-a837-0800200c9a66"
-#     serverSocket = None
-#     inputSocket = None
-    
-#     # start the bluetooth connection with android app
-#     runServer()
-    
-#     # start a thread that will read from the json queue and display json if available
-#     displayThread = threading.Thread(target=get_from_queue, args=(json_queue,))
-#     displayThread.daemon = True
-#     displayThread.start()
-    
-#     # start a receiving thread
-#     receiveThread = threading.Thread(target=readIncomingData, args=(inputSocket, json_queue,))
-#     receiveThread.daemon = True
-#     receiveThread.start()
-        
-#     # start a sending thread for crash detection    
-# #    crashThread  = threading.Thread(target=check_g_force, args=(acc,))
-# #    crashThread.daemon = True
-# #    crashThread.start()

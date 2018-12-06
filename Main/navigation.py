@@ -16,7 +16,7 @@ def bash_command(bash_cmd):
 # function to update the LCD display
 def turn_update(turn, upcoming_road, distance_left, new_maneuver, camera):      
     
-    if turn in ("GO_STRAIGHT","UNDEFINED"):
+    if turn in ("GO_STRAIGHT","UNDEFINED","NO_TURN"):
         if new_maneuver == True:
             bash_command("sudo killall -s SIGKILL pngview")
             sleep(.2)

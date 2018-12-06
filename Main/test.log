@@ -1,0 +1,65 @@
+Script started on Wed 05 Dec 2018 06:00:07 PM CST
+]0;pi@raspberrypi: ~/Project-Apollo/Main[01;32mpi@raspberrypi[00m:[01;34m~/Project-Apollo/Main $[00m exitscriptudo python main.py exit[Ksudo python main.py 
+Getting json strings from the queueInitializing GPIO pins...
+
+Waiting For Sensor To Settle
+0fee0450-e95f-11e5-a837-0800200c9a66
+Listening for connections on port:  0
+^CTraceback (most recent call last):
+  File "main.py", line 286, in <module>
+    inputSocket.close()
+AttributeError: 'NoneType' object has no attribute 'close'
+Exception in thread Thread-2:
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/threading.py", line 801, in __bootstrap_inner
+    self.run()
+  File "/usr/lib/python2.7/threading.py", line 754, in run
+    self.__target(*self.__args, **self.__kwargs)
+  File "main.py", line 83, in trigger
+    GPIO.output(LED, True)
+RuntimeError: Please set pin numbering mode using GPIO.setmode(GPIO.BOARD) or GPIO.setmode(GPIO.BCM)
+
+Exception in thread Thread-4:
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/threading.py", line 801, in __bootstrap_inner
+    self.run()
+  File "/usr/lib/python2.7/threading.py", line 754, in run
+    self.__target(*self.__args, **self.__kwargs)
+  File "main.py", line 63, in pulse
+    while GPIO.input(ECHO)==1:
+AttributeError: 'NoneType' object has no attribute 'input'
+]0;pi@raspberrypi: ~/Project-Apollo/Main[01;32mpi@raspberrypi[00m:[01;34m~/Project-Apollo/Main $[00m sudo python main.py 
+Getting json strings from the queueInitializing GPIO pins...
+
+Waiting For Sensor To Settle
+0fee0450-e95f-11e5-a837-0800200c9a66
+Listening for connections on port:  0
+^CTraceback (most recent call last):
+  File "main.py", line 286, in <module>
+    inputSocket.close()
+AttributeError: 'NoneType' object has no attribute 'close'
+]0;pi@raspberrypi: ~/Project-Apollo/Main[01;32mpi@raspberrypi[00m:[01;34m~/Project-Apollo/Main $[00m sudo python main.py 
+main.py:24: RuntimeWarning: This channel is already in use, continuing anyway.  Use GPIO.setwarnings(False) to disable warnings.
+  GPIO.setup(BLIGHT,GPIO.OUT) ########
+Getting json strings from the queueInitializing GPIO pins...
+
+/home/pi/Project-Apollo/Main/blindspot.py:26: RuntimeWarning: This channel is already in use, continuing anyway.  Use GPIO.setwarnings(False) to disable warnings.
+  GPIO.setup(BlindspotSensor.LTRIG,GPIO.OUT) ########
+/home/pi/Project-Apollo/Main/blindspot.py:28: RuntimeWarning: This channel is already in use, continuing anyway.  Use GPIO.setwarnings(False) to disable warnings.
+  GPIO.setup(BlindspotSensor.LLED, GPIO.OUT)#####
+/home/pi/Project-Apollo/Main/blindspot.py:31: RuntimeWarning: This channel is already in use, continuing anyway.  Use GPIO.setwarnings(False) to disable warnings.
+  GPIO.setup(BlindspotSensor.RTRIG,GPIO.OUT) ###
+/home/pi/Project-Apollo/Main/blindspot.py:33: RuntimeWarning: This channel is already in use, continuing anyway.  Use GPIO.setwarnings(False) to disable warnings.
+  GPIO.setup(BlindspotSensor.RLED, GPIO.OUT) ###
+Waiting For Sensor To Settle
+0fee0450-e95f-11e5-a837-0800200c9a66
+Listening for connections on port:  0
+^CTraceback (most recent call last):
+  File "main.py", line 286, in <module>
+    inputSocket.close()
+AttributeError: 'NoneType' object has no attribute 'close'
+]0;pi@raspberrypi: ~/Project-Apollo/Main[01;32mpi@raspberrypi[00m:[01;34m~/Project-Apollo/Main $[00m ^C
+]0;pi@raspberrypi: ~/Project-Apollo/Main[01;32mpi@raspberrypi[00m:[01;34m~/Project-Apollo/Main $[00m exit
+exit
+
+Script done on Wed 05 Dec 2018 06:02:10 PM CST
