@@ -6,7 +6,7 @@ from navigation import *
 from acceleromter import Accelerometer
 from blindspot import BlindspotSensor
 from Queue import Queue # for bluetooth messaging processing 
-import os       
+import os
 import picamera         # the camera video output library
 from PIL import Image   # to create image using preset png
 import time
@@ -89,7 +89,7 @@ def readIncomingData(inputSocket,q):
     bash_command("sudo killall -s SIGKILL pngview")
     # show text destination arrived
     camera.annotate_text= ''
-    
+ 
 def power_screen(state):
     #GPIO 17 is the pin for backlight
     GPIO.output(BLIGHT, state)   
@@ -116,14 +116,12 @@ def get_from_queue(q):
     global turn, upcoming_road  
     turn          = None
     upcoming_road = None
-    print "Getting json strings from the queue"
+    #print "Getting json strings from the queue"
     while True:
         # this .get() function will block until there is item available
         json_str = q.get()
-        print "json from the queue: " + json_str
-        
+        #print "json from the queue: " + json_str
         json_data = json.loads(json_str)
-        
         ## change cras,display/blindspot to keys
         if "crashSensor" in json_data:
             state = json_data["crashSensor"]
@@ -136,8 +134,7 @@ def get_from_queue(q):
             state = json_data["hud"]
             power_screen(state)            
         elif "blindspotSensor" in json_data:
-            state = json_data["blindspotSensor"]
-            
+            state = json_data["blindspotSensor"] 
             #call the function to enable u;tasonic sensor
             blindspotSensor(state)
             pass
@@ -146,6 +143,7 @@ def get_from_queue(q):
                 GPIO.cleanup()
                 inputSocket.close()
                 serverSocket.close()
+                bash_command("sudo killall -s SIGKILL pngview")
                 camera.close()
             finally:
                 bash_command("sudo shutdown now")
@@ -153,22 +151,20 @@ def get_from_queue(q):
             display(json_data) # display and update the screen
         q.task_done() # indicate a formerly enqueued task is done
         #it will resume q.join() if it is blocking and resume when all items has been processed
-                
 def runServer():
     global serverSocket, inputSocket
-    GPIO.output(BLIGHT, True)                
+    GPIO.output(BLIGHT, True)
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = bluetooth.PORT_ANY
     print uuid
     serverSocket.bind(("",port))
-  
     print "Listening for connections on port: ", port   
 
     # wait for a message to be sent to this socket only once
     serverSocket.listen(1)
     port=serverSocket.getsockname()[1]
-   
+
     # you were 90% there, just needed to use the pyBluez command:
     bluetooth.advertise_service( serverSocket, "SampleServer",
                         service_id = uuid,
@@ -178,8 +174,8 @@ def runServer():
 
     inputSocket,address = serverSocket.accept()
     print "Got connection with" , address
-    
-    accelerometer = Accelerometer()        
+
+    accelerometer = Accelerometer()
     crashThread  = threading.Thread(target=check_g_force, args=(accelerometer.acc, inputSocket))
     crashThread.daemon = True
     crashThread.start()
@@ -189,6 +185,7 @@ def runServer():
     except bluetooth.btcommon.BluetoothError:
         inputSocket.close()
         serverSocket.close()
+        bash_command("sudo killall -s SIGKILL pngview")
         GPIO.output(BLIGHT, False)
         camera.close()
         print "Bluetooth connection reset"
@@ -198,7 +195,7 @@ def check_g_force(acc, inputSocket):
         global crashSensorOn
 
         while inputSocket is not None:
-            while crashSensorOn:        
+            while crashSensorOn:
                 axes = acc.getAxes(True)
                 # print "ADXL345 on address 0x%x:" % (acc.address)
                 if abs(axes['x']) > Accelerometer.MAX_G or abs(axes['y']) > Accelerometer.MAX_G or abs(axes['z']) > Accelerometer.MAX_G:
@@ -212,7 +209,6 @@ def check_g_force(acc, inputSocket):
                         except BluetoothError:
                             print "Bad file descriptor happened here"
                         sleep(2)
-                  
 
 if __name__=="__main__":
     try:
@@ -222,10 +218,8 @@ if __name__=="__main__":
         bash_command("sudo modprobe fbtft_device fps=60 txbuflen=32768 name=adafruit18 rotate=90")
         # wait until the screen initialize
         sleep(2)
-        
 #        bash_command("sudo fbcp &")   # redirect/copy the all output from fb 0 to fb1
         power_screen(True)
-        
         global serverSocket, inputSocket 
         name="bt_server"
         target_name="test"
@@ -238,10 +232,8 @@ if __name__=="__main__":
         displayThread = threading.Thread(target=get_from_queue, args=(json_queue,))
         displayThread.daemon = True
         displayThread.start()
-        
         #turn the blind spot sensor on
         blindspotSensor(True)
-                
         while True:
             GPIO.output(BLIGHT, False)
             # set up camera and start it, global variable so other functions can use it too
@@ -261,14 +253,11 @@ if __name__=="__main__":
         print "Ending program"
         traceback.print_exc()
         GPIO.cleanup()
-        
         # Turn screen off
+        bash_command("sudo killall -s SIGKILL pngview")
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(BLIGHT,GPIO.OUT)
         GPIO.output(BLIGHT, False)
         inputSocket.close()
         serverSocket.close()
-        
         camera.close()
-        
-        
