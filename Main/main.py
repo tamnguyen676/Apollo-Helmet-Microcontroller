@@ -19,9 +19,12 @@ crashSensorOn = hudOn = True
 #initialize the GPIO
 GPIO.setmode(GPIO.BCM)
 
-BLIGHT = 17
+BLIGHT = 18
 #set up pin 17 as output
-GPIO.setup(BLIGHT,GPIO.OUT) ########
+# GPIO.setup(BLIGHT,GPIO.OUT) ########
+pwm = GPIO.PWM(18, 1000)
+pwm.start(0)
+
 #make rpi bluetooth discoverable via hciconfig and noauth makes it so that we dont have to click "accept"
 bash_command("sudo hciconfig hci0 piscan noauth")
 
@@ -91,14 +94,17 @@ def readIncomingData(inputSocket,q):
     camera.annotate_text= ''
  
 def power_screen(state):
-    #GPIO 17 is the pin for backlight
-    GPIO.output(BLIGHT, state)   
+    #GPIO 18 is the pin for backlight
+
+    # GPIO.output(BLIGHT, state)   
     if state == False:
+        pwm.ChangeDutyCycle(0)
         bash_command("sudo killall -9 fbcp")
         sleep(2)
         bash_command("sudo rmmod fb_st7735r")
         sleep(1)
     else:
+        pwm.ChangeDutyCycle(100)
         bash_command("sudo modprobe fb_st7735r")
         sleep(2)
         bash_command("fbcp &") 
@@ -138,6 +144,8 @@ def get_from_queue(q):
             #call the function to enable u;tasonic sensor
             blindspotSensor(state)
             pass
+        elif "hudBrightness" in json_data:
+            pwm.ChangeDutyCycle(json_data["hudBrightness"])
         elif "killPi" in json_data:
             try:
                 GPIO.cleanup()
@@ -153,7 +161,8 @@ def get_from_queue(q):
         #it will resume q.join() if it is blocking and resume when all items has been processed
 def runServer():
     global serverSocket, inputSocket
-    GPIO.output(BLIGHT, True)
+    # GPIO.output(BLIGHT, True)
+    pwm.ChangeDutyCycle(100)
     # you had indentation problems on this line:
     serverSocket=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = bluetooth.PORT_ANY
@@ -186,7 +195,8 @@ def runServer():
         inputSocket.close()
         serverSocket.close()
         bash_command("sudo killall -s SIGKILL pngview")
-        GPIO.output(BLIGHT, False)
+        # GPIO.output(BLIGHT, False)
+        pwm.ChangeDutyCycle(0)
         camera.close()
         print "Bluetooth connection reset"
 
@@ -235,7 +245,8 @@ if __name__=="__main__":
         #turn the blind spot sensor on
         blindspotSensor(True)
         while True:
-            GPIO.output(BLIGHT, False)
+            # GPIO.output(BLIGHT, False)
+            pwm.ChangeDutyCycle(0)
             # set up camera and start it, global variable so other functions can use it too
             camera = picamera.PiCamera()    
             camera.resolution = (1280, 720) # set up resolution
@@ -255,9 +266,10 @@ if __name__=="__main__":
         GPIO.cleanup()
         # Turn screen off
         bash_command("sudo killall -s SIGKILL pngview")
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(BLIGHT,GPIO.OUT)
-        GPIO.output(BLIGHT, False)
+        # GPIO.setmode(GPIO.BCM)
+        # GPIO.setup(BLIGHT,GPIO.OUT)
+        # GPIO.output(BLIGHT, False)
+        pwm.ChangeDutyCycle(0)
         inputSocket.close()
         serverSocket.close()
         camera.close()
